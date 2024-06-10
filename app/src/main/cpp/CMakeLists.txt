@@ -9,7 +9,7 @@ cmake_minimum_required(VERSION 3.22.1)
 # Since this is the top level CMakeLists.txt, the project name is also accessible
 # with ${CMAKE_PROJECT_NAME} (both CMake variables are in-sync within the top level
 # build script scope).
-project("genai")
+project("assistant")
 
 #set(APP_LIB_DIR ${PROJECT_SOURCE_DIR}/../../../libs)
 
@@ -41,3 +41,6 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
         onnxruntime
         android
         log)
+
+add_library(${CMAKE_PROJECT_NAME}-wakeword SHARED
+        wake-word.cpp)

@@ -65,7 +65,7 @@ class GenAIWrapper(modelPath: String) : AutoCloseable {
     companion object {
         // Load the GenAI library on application startup.
         init {
-            System.loadLibrary("genai") // JNI layer
+            System.loadLibrary("assistant") // JNI layer
             System.loadLibrary("onnxruntime-genai")
             System.loadLibrary("onnxruntime")
         }

@@ -87,18 +87,8 @@ class ASRService : Service() {
                 "asr.onnx"
             )
         )
-        wakeWord = WakeWord(
-            Utils.copyAssetsToInternalStorage(
-                this,
-                R.raw.melspectrogram,
-                "mel_spec.onnx"
-            ),
-            Utils.copyAssetsToInternalStorage(
-                this,
-                R.raw.embedding_model,
-                "embedding.onnx"
-            )
-        )
+        wakeWord = WakeWord(this)
+
         startRecording()
         return START_STICKY
     }
