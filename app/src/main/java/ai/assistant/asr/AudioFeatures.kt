@@ -9,9 +9,20 @@ import android.util.Log
 import org.jetbrains.kotlinx.multik.api.NativeEngineType
 import org.jetbrains.kotlinx.multik.api.arange
 import org.jetbrains.kotlinx.multik.api.mk
+import org.jetbrains.kotlinx.multik.api.ndarray
 import org.jetbrains.kotlinx.multik.api.ones
+import org.jetbrains.kotlinx.multik.ndarray.data.D1
+import org.jetbrains.kotlinx.multik.ndarray.data.D2
 import org.jetbrains.kotlinx.multik.ndarray.data.D2Array
+import org.jetbrains.kotlinx.multik.ndarray.data.MultiArray
+import org.jetbrains.kotlinx.multik.ndarray.data.get
 import org.jetbrains.kotlinx.multik.ndarray.data.slice
+import org.jetbrains.kotlinx.multik.ndarray.operations.div
+import org.jetbrains.kotlinx.multik.ndarray.operations.plus
+import org.jetbrains.kotlinx.multik.ndarray.operations.stack
+import org.jetbrains.kotlinx.multik.ndarray.operations.times
+import org.jetbrains.kotlinx.multik.ndarray.operations.toFloatArray
+import org.jetbrains.kotlinx.multik.ndarray.operations.toList
 
 class AudioFeatures(context: Context, sampleRate: Int = 16000) {
     private val mContext = context
@@ -23,8 +34,11 @@ class AudioFeatures(context: Context, sampleRate: Int = 16000) {
     private var accumulatedSamples = 0
     private var melSpectrogramBuffer = mk.ones<Float>(76, 32)
     private val melSpectrogramMaxLen = 10 * 97
+    private val featureBufferMaxLen = 120
     private val mSampleRate = sampleRate
     private var rawDataBuffer = FloatArray(0)
+    private var featureBuffer = mk.ones<Float>(16,96)
+
     init {
         mk!!.addEngine(NativeEngineType)
         // lightweight model
@@ -40,20 +54,35 @@ class AudioFeatures(context: Context, sampleRate: Int = 16000) {
 
     private fun bufferRawData(x: FloatArray) {
 //        self.raw_data_buffer.extend(x.tolist() if isinstance(x, np.ndarray) else x)
-        val buffer = rawDataReminder + x
-        rawDataReminder = buffer
+        val buffer = rawDataBuffer + x
+        rawDataBuffer = buffer
 //        return buffer
     }
+
     private fun clear() {
         rawDataBuffer = FloatArray(0)
     }
+
+    private fun getEmbeddingModelPredict(x: D2Array<Float>): FloatArray {
+        val input = createFloatTensor(env, x.toFloatArray(), tensorShape(1, 76, 32, 1))
+        val inputs = mutableMapOf<String, OnnxTensor>()
+        inputs["input_1"] = input
+        val output = embeddingModel!!.run(inputs)
+        input.close()
+        val tmp = output.use { it[0].value as Array<Array<Array<FloatArray>>> }[0][0][0]
+        return tmp
+    }
+
     private fun streamingMelSpectrogram(nSamples: Int) {
         if (rawDataBuffer.size < 400) {
             throw IllegalArgumentException("The number of input frames must be at least 400 samples @ 16khz (25 ms)!")
         }
-        Log.d("rawDataBuffer", rawDataBuffer.size.toString())
-        val melSpec = getMelSpec(rawDataBuffer.takeLast(nSamples + 160*3).toFloatArray())
+        val tmp = rawDataBuffer.takeLast(nSamples + 160 * 3)
 
+        val melSpec = getMelSpec(tmp.toFloatArray())
+        var melSpecTrans:MultiArray<Float, D2> = mk.ndarray(melSpec, melSpec.size/32, 32)
+        melSpecTrans = melSpecTrans.times(0.1f).plus(2.0f)
+        melSpectrogramBuffer = melSpectrogramBuffer.cat(melSpecTrans, axis = 0)
 //        melSpectrogramBuffer
         if (melSpectrogramBuffer.shape[0] > melSpectrogramMaxLen) {
             // update melSpectrogramBuffer from the end of the buffer to the beginning melSpectrogramMaxLen
@@ -62,20 +91,19 @@ class AudioFeatures(context: Context, sampleRate: Int = 16000) {
                 axis = 0
             )
         }
-        Log.d("melSpec", melSpec.size.toString())
     }
 
     private fun streamingFeatures(x: FloatArray): Int {
         var processedSamples = 0
-
+        var x = x
+//        Log.d("accumulatedSamples", accumulatedSamples.toString())
         if (rawDataReminder.isNotEmpty()) {
-            val x = rawDataReminder + x
+            x = rawDataReminder + x
             rawDataReminder = FloatArray(0)
         }
-        if (accumulatedSamples + x.size < 1280) {
+        if (accumulatedSamples + x.size >= 1280) {
             val reminder = (accumulatedSamples + x.size) % 1280
             if (reminder != 0) {
-//                x_even_chunks = x[0:-remainder]
                 val xEvenChunks = x.sliceArray(0 until x.size - reminder)
                 bufferRawData(xEvenChunks)
                 accumulatedSamples += xEvenChunks.size
@@ -102,28 +130,42 @@ class AudioFeatures(context: Context, sampleRate: Int = 16000) {
                 ndx = if (ndx != 0) ndx else melSpectrogramBuffer.shape[0]
 //                x = self.melspectrogram_buffer[-76 + ndx:ndx].astype(np.float32)[None, :, :, None]
                 val tmp: D2Array<Float> = melSpectrogramBuffer.slice(
-                    (melSpectrogramBuffer.shape[0] - 76 + ndx) until ndx,
-                  axis = 0
+                    (-76 + ndx) until ndx,
+                    axis = 0
                 )
 //                if x.shape[1] == 76:
-                if (tmp.shape[1] == 76) {
-
+                if (tmp.shape[0] == 76) {
+                    val output = getEmbeddingModelPredict(tmp)
+                    featureBuffer = featureBuffer.cat(mk.ndarray(output,1 ,96), axis = 0)
                 }
-//                self.feature_buffer = np.vstack((self.feature_buffer,
-//                    self.embedding_model_predict(x)))
-
             }
 
             processedSamples = accumulatedSamples
             accumulatedSamples = 0
         }
+        if (featureBuffer.shape[0] > featureBufferMaxLen) {
+            featureBuffer = featureBuffer.slice(featureBuffer.shape[0]-featureBufferMaxLen until featureBuffer.shape[0], axis = 0)
+        }
 //        return processed_samples if processed_samples != 0 else self.accumulated_samples
         return if (processedSamples != 0) processedSamples else accumulatedSamples
     }
 
-    fun invoke(x: FloatArray): FloatArray {
-        streamingFeatures(x)
-        return FloatArray(0)
+    fun getFeatures(nFeatureFrames:Int = 16, startNdx: Int = 0): MultiArray<Float, D2> {
+//        Log.d("featureBuffer", "${featureBuffer.shape[0]}, ${featureBuffer.shape[1]}")
+//        if start_ndx != -1:
+//            end_ndx = start_ndx + int(n_feature_frames) if start_ndx + n_feature_frames != 0 else len(self.feature_buffer)
+        if (startNdx != 0) {
+            val endNdx = if ((startNdx + nFeatureFrames) != 0) (startNdx + nFeatureFrames)  else featureBuffer.shape[0]
+            return featureBuffer.slice(startNdx until endNdx, axis = 0)
+        }else {
+//            return self.feature_buffer[int(-1*n_feature_frames):, :][None, ].astype(np.float32)
+            return featureBuffer.slice(featureBuffer.shape[0] - nFeatureFrames until featureBuffer.shape[0], axis = 0)
+        }
+
+    }
+
+    fun invoke(x: FloatArray): Int {
+        return streamingFeatures(x)
     }
 
     private fun getMelSpec(audioData: FloatArray, windowSize: Int = 76): FloatArray {
@@ -134,7 +176,7 @@ class AudioFeatures(context: Context, sampleRate: Int = 16000) {
         val melSpecOutput = melSpecModel!!.run(inputs)
         melSpecInput.close()
         val tmp =
-            melSpecOutput.use { it[0].value as Array<Array<Array<FloatArray>>> }[0][0].flatMap { it.asIterable() }
+            melSpecOutput.use { it[0].value as Array<Array<Array<FloatArray>>> }[0][0].flatMap { it.toList() }
                 .toFloatArray()
 
         return tmp

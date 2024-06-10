@@ -17,6 +17,7 @@ import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.media.audiofx.AcousticEchoCanceler
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.ActivityCompat
@@ -76,18 +77,19 @@ class ASRService : Service() {
                 minSilenceDurationMs,
                 speechPadMs
             )
-        } catch (e: OrtException) {
-            Log.e(ASRService::class.java.name, "Error initializing the VAD detector: " + e.message)
-        }
-//        wakeWord = WakeWord()
-        speechRecognizer = SpeechRecognizer(
-            Utils.copyAssetsToInternalStorage(
-                this,
-                R.raw.whisper_cpu_int8_cpu_cpu_model,
-                "asr.onnx"
+            //        wakeWord = WakeWord()
+            speechRecognizer = SpeechRecognizer(
+                Utils.copyAssetsToInternalStorage(
+                    this,
+                    R.raw.whisper_cpu_int8_cpu_cpu_model,
+                    "asr.onnx"
+                )
             )
-        )
-        wakeWord = WakeWord(this)
+            wakeWord = WakeWord(this)
+        } catch (e: OrtException) {
+            Log.e(ASRService::class.java.name, "Error initializing: " + e.message)
+        }
+
 
         startRecording()
         return START_STICKY
@@ -122,6 +124,10 @@ class ASRService : Service() {
                 windowSizeSamples,
 
                 )
+//            val echoCanceler = AcousticEchoCanceler.create(audioRecord!!.audioSessionId)
+//            if (echoCanceler != null) {
+//                echoCanceler.enabled = true
+//            }
 //            audioRecord!!.set
         }
         if (!isStarted) {
@@ -153,29 +159,25 @@ class ASRService : Service() {
         while (isStarted) {
             val read =
                 audioRecord?.read(audioBuffer, 0, audioBuffer.size, AudioRecord.READ_BLOCKING) ?: 0
-
-            wakeWordExecutors.submit {
-                detectWakeWord(audioBuffer)
-            }
-
+//            Log.d("ASRService", "Read $read samples")
             if (read > 0) {
-                // Process the audioBuffer here
-                // make sure audioData size < maxBufferSize
-                audioData += audioBuffer
-                if (audioData.size > maxBufferSize) {
-                    audioData =
-                        audioData.sliceArray(audioData.size - maxBufferSize until audioData.size)
-                }
-//                Log.d("WakewordService", "Processing audio stream")
-//                wakeWord!!.detectWakeWord(0, melspecModel!!, 0, audioBuffer)
-//                ...
-//                if (isWakeWordDetected()) {
+
+
                 val detectResult = vadDetector!!.apply(audioBuffer, true)
                 if (detectResult.containsKey("start")) {
                     Log.d("ASRService", "Start talking")
                     startVoice = detectResult["start"]!!
                     isTalking = true
-                } else if (detectResult.containsKey("end")) {
+                }
+                if (isTalking) {
+                    audioData += audioBuffer
+                    if (audioData.size > maxBufferSize) {
+                        audioData =
+                            audioData.sliceArray(audioData.size - maxBufferSize until audioData.size)
+                    }
+                }
+
+                if (detectResult.containsKey("end")) {
                     Log.d("ASRService", "End talking")
                     endVoice = detectResult["end"]!!
                     isTalking = false
@@ -184,8 +186,9 @@ class ASRService : Service() {
                 if (audioData.isNotEmpty() && detectResult.containsKey("end")) {
                     // new thread to recognize speech
                     Log.d("ASRService", "Voice length: ${endVoice - startVoice}")
-                    recognizerExecutors.submit {
-                        recognizeSpeech()
+
+                    wakeWordExecutors.submit {
+                        detectWakeWord(audioData)
                     }
 
                 }
@@ -213,7 +216,12 @@ class ASRService : Service() {
     }
 
     private fun detectWakeWord(audioBuffer: FloatArray) {
-        wakeWord?.invoke(audioBuffer)
+        if (wakeWord?.invoke(audioBuffer)!!) {
+
+//            recognizerExecutors.submit {
+//                recognizeSpeech()
+//            }
+        }
     }
 
 }

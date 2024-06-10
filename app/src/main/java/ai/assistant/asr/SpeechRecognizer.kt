@@ -13,6 +13,7 @@ class SpeechRecognizer(modelPath: String) : AutoCloseable {
     init {
         val env = OrtEnvironment.getEnvironment()
         val sessionOptions = OrtSession.SessionOptions()
+        sessionOptions.addNnapi()
         sessionOptions.registerCustomOpLibrary(OrtxPackage.getLibraryPath())
 
         session = env.createSession(modelPath, sessionOptions)
