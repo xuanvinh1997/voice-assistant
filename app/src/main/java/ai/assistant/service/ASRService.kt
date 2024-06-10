@@ -223,10 +223,7 @@ class ASRService : Service() {
     }
 
     private fun detectWakeWord(audioBuffer: FloatArray) {
-        Log.d(
-            "WakeWord",
-            "Inference melspectrogram: ${wakeWord!!.getMelSpec(audioBuffer)!!.inferenceTimeInMs}"
-        )
+        wakeWord?.invoke(audioBuffer)
     }
 
 }
