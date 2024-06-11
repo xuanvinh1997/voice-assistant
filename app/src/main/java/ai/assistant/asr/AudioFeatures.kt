@@ -29,12 +29,12 @@ class AudioFeatures(context: Context, sampleRate: Int = 16000) {
     private val sessionOptions = OrtSession.SessionOptions()
     private var rawDataReminder = ShortArray(0)
     private var accumulatedSamples = 0
-    private var melSpectrogramBuffer = mk.zeros<Float>(1, 32)
+    private var melSpectrogramBuffer = mk.zeros<Float>(0, 32)
     private val melSpectrogramMaxLen = 10 * 97
     private val featureBufferMaxLen = 120
     private val mSampleRate = sampleRate
     private var rawDataBuffer = ShortArray(0)
-    private var featureBuffer = mk.zeros<Float>(1, 96)
+    private var featureBuffer = mk.zeros<Float>(0, 96)
 
     init {
         mk!!.addEngine(NativeEngineType)
@@ -49,21 +49,15 @@ class AudioFeatures(context: Context, sampleRate: Int = 16000) {
         }
     }
 
-    private fun bufferRawData(x: ShortArray) {
-//        self.raw_data_buffer.extend(x.tolist() if isinstance(x, np.ndarray) else x)
-        val buffer = rawDataBuffer + x
-        rawDataBuffer = buffer
-//        return buffer
-    }
 
 
-    private fun getEmbeddingModelPredict(x: D2Array<Float>): FloatArray {
-        if (x.shape[0] < 76) {
+    private fun getEmbeddingModelPredict(): FloatArray {
+        if (melSpectrogramBuffer.shape[0] < 76) {
             return floatArrayOf()
         }
         // get last 76 frames
-        val frames = x[x.shape[0] - 76 until x.shape[0]]
-        val input = createFloatTensor(env, frames.toFloatArray(), tensorShape(1, 76, 32, 1))
+        val frames: MultiArray<Float, D2> = melSpectrogramBuffer.slice(melSpectrogramBuffer.shape[0] - 76 until melSpectrogramBuffer.shape[0], axis = 0)
+        val input = createFloatTensor(env, frames.flatten().toFloatArray(), tensorShape(1, 76, 32, 1))
         val inputs = mutableMapOf<String, OnnxTensor>()
         inputs["input_1"] = input
         val output = embeddingModel!!.run(inputs)
@@ -73,11 +67,11 @@ class AudioFeatures(context: Context, sampleRate: Int = 16000) {
     }
 
     fun streamingFeatures(x: ShortArray) {
-        val melSpec = getMelSpec(x)
-        var melSpecTrans: MultiArray<Float, D2> = mk.ndarray(melSpec, melSpec.size / 32, 32)
-        melSpecTrans = melSpecTrans.times(0.1f).plus(2.0f)
-        melSpectrogramBuffer = melSpectrogramBuffer.cat(melSpecTrans, axis = 0)
-        val feature = getEmbeddingModelPredict(melSpectrogramBuffer)
+        rawDataBuffer = rawDataBuffer.plus(x)
+        val melSpec = getMelSpec()
+
+        melSpectrogramBuffer = melSpectrogramBuffer.cat(mk.ndarray(melSpec, melSpec.size / 32, 32), axis = 0)
+        val feature = getEmbeddingModelPredict()
         if (feature.size == 96) {
             featureBuffer = featureBuffer.cat(mk.ndarray(feature, 1, 96), axis = 0)
         }
@@ -104,17 +98,18 @@ class AudioFeatures(context: Context, sampleRate: Int = 16000) {
         return featuresArray.flatten().toFloatArray()
     }
 
-    private fun getMelSpec(audioData: ShortArray, windowSize: Int = 76): FloatArray {
-        val floatArray = audioData.map { it.toFloat() }.toFloatArray()
+    private fun getMelSpec(): FloatArray {
+        val floatArray = rawDataBuffer.map { it.toFloat() }.toFloatArray()
         val melSpecInput =
-            createFloatTensor(env, floatArray, tensorShape(1, audioData.size.toLong()))
+            createFloatTensor(env, floatArray, tensorShape(1, floatArray.size.toLong()))
         val inputs = mutableMapOf<String, OnnxTensor>()
         inputs["input"] = melSpecInput
         val melSpecOutput = melSpecModel!!.run(inputs)
         melSpecInput.close()
         val tmp =
             melSpecOutput.use { it[0].value as Array<Array<Array<FloatArray>>> }[0][0]
-                .flatMap { it.toList() }
+                .flatMap { it.toList()  }
+                .map { it / 10 +2 }
                 .toFloatArray()
 
         return tmp

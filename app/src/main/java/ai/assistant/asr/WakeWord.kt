@@ -7,9 +7,7 @@ import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import android.content.Context
 import android.util.Log
-import org.jetbrains.kotlinx.multik.api.arange
-import org.jetbrains.kotlinx.multik.api.mk
-import org.jetbrains.kotlinx.multik.ndarray.operations.toFloatArray
+
 
 class WakeWord(context: Context) {
     private val audioFeatures = lazy { AudioFeatures(context = context) }.value

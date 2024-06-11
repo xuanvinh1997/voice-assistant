@@ -161,7 +161,9 @@ class ASRService : Service() {
                 audioRecord?.read(audioBuffer, 0, audioBuffer.size, AudioRecord.READ_BLOCKING) ?: 0
 //            Log.d("ASRService", "Read $read samples")
             if (read > 0) {
-                detectWakeWord(audioBuffer)
+                wakeWordExecutors.submit {
+                    detectWakeWord(audioBuffer)
+                }
 
 
 //                val detectResult = vadDetector!!.apply(audioBuffer, true)
