@@ -35,26 +35,19 @@ class WakeWord(context: Context) {
 
         return outputTensor[0][0]
     }
-    fun invoke(x: FloatArray): Boolean {
-        val nPreparedSamples = audioFeatures.invoke(x)
-        if(nPreparedSamples>1280){
-            for (i in mk.arange<Int>(nPreparedSamples.div(1280) - 1, -1, -1)) {
-                val start = 16 - i
-                val features = audioFeatures.getFeatures(16, start)
-                val prediction = infer(features!!.toFloatArray())
-                Log.d("WakeWord", "Prediction: $prediction")
-            }
-//
-        }else {
-            if (nPreparedSamples == 1280) {
-                val features = audioFeatures.getFeatures(16, 0)
-//                Log.d("WakeWord", "Features: ${features!!.size}")
-                val prediction = infer(features!!.toFloatArray())
-                if(prediction > 0.5){
-                    Log.d("WakeWord", "Prediction: $prediction")
-                }
-            }
+
+
+    fun invoke(x: ShortArray): Boolean {
+        audioFeatures.streamingFeatures(x)
+        val features = audioFeatures.getFeatures()
+        if(features.isEmpty()) {
+            return false
         }
-        return true
+        val prediction = infer(features)
+        if (prediction > 0.3) {
+            Log.d("WakeWord", "Prediction: $prediction")
+            return true
+        }
+        return false
     }
 }

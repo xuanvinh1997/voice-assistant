@@ -120,7 +120,7 @@ class ASRService : Service() {
                 MediaRecorder.AudioSource.VOICE_RECOGNITION,
                 sampleRate,
                 AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_FLOAT,
+                AudioFormat.ENCODING_PCM_16BIT,
                 windowSizeSamples,
 
                 )
@@ -155,43 +155,43 @@ class ASRService : Service() {
     private var startVoice = 0.0
     private var endVoice = 0.0
     private fun processAudioStream() {
-        val audioBuffer = FloatArray(windowSizeSamples)
+        val audioBuffer = ShortArray(windowSizeSamples)
         while (isStarted) {
             val read =
                 audioRecord?.read(audioBuffer, 0, audioBuffer.size, AudioRecord.READ_BLOCKING) ?: 0
 //            Log.d("ASRService", "Read $read samples")
             if (read > 0) {
+                detectWakeWord(audioBuffer)
 
 
-                val detectResult = vadDetector!!.apply(audioBuffer, true)
-                if (detectResult.containsKey("start")) {
-                    Log.d("ASRService", "Start talking")
-                    startVoice = detectResult["start"]!!
-                    isTalking = true
-                }
-                if (isTalking) {
-                    audioData += audioBuffer
-                    if (audioData.size > maxBufferSize) {
-                        audioData =
-                            audioData.sliceArray(audioData.size - maxBufferSize until audioData.size)
-                    }
-                }
-
-                if (detectResult.containsKey("end")) {
-                    Log.d("ASRService", "End talking")
-                    endVoice = detectResult["end"]!!
-                    isTalking = false
-                }
-
-                if (audioData.isNotEmpty() && detectResult.containsKey("end")) {
-                    // new thread to recognize speech
-                    Log.d("ASRService", "Voice length: ${endVoice - startVoice}")
-
-                    wakeWordExecutors.submit {
-                        detectWakeWord(audioData)
-                    }
-
-                }
+//                val detectResult = vadDetector!!.apply(audioBuffer, true)
+//                if (detectResult.containsKey("start")) {
+//                    Log.d("ASRService", "Start talking")
+//                    startVoice = detectResult["start"]!!
+//                    isTalking = true
+//                }
+//                if (isTalking) {
+//                    audioData += audioBuffer
+//                    if (audioData.size > maxBufferSize) {
+//                        audioData =
+//                            audioData.sliceArray(audioData.size - maxBufferSize until audioData.size)
+//                    }
+//                }
+//
+//                if (detectResult.containsKey("end")) {
+//                    Log.d("ASRService", "End talking")
+//                    endVoice = detectResult["end"]!!
+//                    isTalking = false
+//                }
+//
+//                if (audioData.isNotEmpty() && detectResult.containsKey("end")) {
+//                    // new thread to recognize speech
+//                    Log.d("ASRService", "Voice length: ${endVoice - startVoice}")
+//
+//                    wakeWordExecutors.submit {
+//                    }
+//
+//                }
             }
         }
     }
@@ -215,7 +215,7 @@ class ASRService : Service() {
 
     }
 
-    private fun detectWakeWord(audioBuffer: FloatArray) {
+    private fun detectWakeWord(audioBuffer: ShortArray) {
         if (wakeWord?.invoke(audioBuffer)!!) {
 
 //            recognizerExecutors.submit {
