@@ -3,5 +3,8 @@
     <string name="use_prerecorded_audio">Use Prerecorded Audio</string>
     <string name="record">Record</string>
     <string name="stop">Stop</string>
+    <string name="map">Map</string>
+    <string name="call">Call</string>
+    <string name="media">Media</string>
     <string name="instructions">Press a button to provide audio input and then the recognized speech will be displayed.\nThe maximum recording length is 30 seconds.</string>
 </resources>

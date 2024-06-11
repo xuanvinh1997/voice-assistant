@@ -2,7 +2,17 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <uses-feature
+        android:name="android.hardware.telephony"
+        android:required="false" />
+
+    <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -12,12 +22,17 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.SpeechRecognition"
         tools:targetApi="31">
-        <service android:name=".service.ASRService"
+        <service
+            android:name=".service.ASRService"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.ASRService" />
             </intent-filter>
         </service>
+        <service
+            android:name=".service.RedirectService"
+            android:exported="false" />
+
         <activity
             android:name="ai.assistant.MainActivity"
             android:exported="true">

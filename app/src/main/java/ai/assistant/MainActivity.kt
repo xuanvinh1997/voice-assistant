@@ -1,6 +1,7 @@
 package ai.assistant
 
 import ai.assistant.service.ASRService
+import ai.assistant.service.RedirectService
 import android.content.Intent
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
@@ -18,6 +19,25 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         ActivityCompat.requestPermissions(this, permissions, REQUEST_RECORD_AUDIO_PERMISSION)
+        // click button map
+        findViewById<android.widget.Button>(R.id.use_go_to_map_button).setOnClickListener {
+            openRedirectService("Vincom Nguyễn Chí Thanh", "map")
+        }
+
+        // click button media
+        findViewById<android.widget.Button>(R.id.media_button).setOnClickListener {
+            openRedirectService("", "media")
+        }
+
+        // click button youtube
+        findViewById<android.widget.Button>(R.id.youtube_button).setOnClickListener {
+            openRedirectService("Học lập trình Android", "youtube")
+        }
+
+        // click button call
+        findViewById<android.widget.Button>(R.id.call_button).setOnClickListener {
+            openRedirectService("0966913714", "call")
+        }
 
     }
 
@@ -50,6 +70,14 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         val TAG: String? = MainActivity::class.simpleName
+    }
+
+    private fun openRedirectService(value: String, case: String) {
+        val serviceIntent = Intent(this, RedirectService::class.java).apply {
+            putExtra("value", value)
+            putExtra("case", case)
+        }
+        startService(serviceIntent)
     }
 
 }
