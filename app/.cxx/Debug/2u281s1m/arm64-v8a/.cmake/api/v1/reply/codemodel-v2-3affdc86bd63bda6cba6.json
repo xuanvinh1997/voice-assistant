@@ -1,0 +1,69 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"jsonFile" : "directory-.-Debug-f5ebdc15457944623624.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.6.0"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "assistant",
+					"targetIndexes" : 
+					[
+						0,
+						1
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "assistant::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-assistant-Debug-f7d17c30cde81abd80e5.json",
+					"name" : "assistant",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "assistant-wakeword::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-assistant-wakeword-Debug-ea410a78117c2e0fe189.json",
+					"name" : "assistant-wakeword",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "/Users/vinhpx/Workspaces/voice-command/voice-assistant/app/.cxx/Debug/2u281s1m/arm64-v8a",
+		"source" : "/Users/vinhpx/Workspaces/voice-command/voice-assistant/app/src/main/cpp"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 3
+	}
+}

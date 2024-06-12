@@ -46,7 +46,7 @@ namespace {
     };
 }
 
-extern "C" JNIEXPORT jlong  extern "C" jlong
+extern "C" JNIEXPORT jlong  JNICALL
 Java_ai_assistant_llm_GenAIWrapper_loadModel(JNIEnv *env, jobject thiz, jstring model_path) {
     CString path{env, model_path};
     OgaModel *model = nullptr;

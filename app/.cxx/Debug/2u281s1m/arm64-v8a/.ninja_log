@@ -1,0 +1,5 @@
+# ninja log v5
+0	21	1718173278846256012	CMakeFiles/assistant-wakeword.dir/wake-word.cpp.o	b1ce41f7611b94f7
+21	58	1718173278882379591	/Users/vinhpx/Workspaces/voice-command/voice-assistant/app/build/intermediates/cxx/Debug/2u281s1m/obj/arm64-v8a/libassistant-wakeword.so	df1c2ec406573c63
+0	328	1718173322710990300	CMakeFiles/assistant.dir/native-lib.cpp.o	9b8d77ae4f5d3100
+329	376	1718173322754720047	/Users/vinhpx/Workspaces/voice-command/voice-assistant/app/build/intermediates/cxx/Debug/2u281s1m/obj/arm64-v8a/libassistant.so	c95890a75037c523

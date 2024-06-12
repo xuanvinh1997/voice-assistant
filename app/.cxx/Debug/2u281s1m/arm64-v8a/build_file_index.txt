@@ -1,0 +1,1 @@
+/Users/vinhpx/Workspaces/voice-command/voice-assistant/app/src/main/cpp/CMakeLists.txt

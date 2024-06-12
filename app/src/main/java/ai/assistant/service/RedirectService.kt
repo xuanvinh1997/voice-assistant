@@ -1,6 +1,7 @@
 package ai.assistant.service
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Service
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -76,6 +77,7 @@ class RedirectService : Service() {
         }
     }
 
+    @SuppressLint("QueryPermissionsNeeded")
     private fun openMediaGallery() {
         // Tạo một Intent để mở ứng dụng bộ sưu tập
         val intent = Intent(Intent.ACTION_VIEW)
