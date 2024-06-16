@@ -1,4 +1,0 @@
-/Users/vinhpx/Workspaces/voice-command/voice-assistant/app/.cxx/Debug/2u281s1m/arm64-v8a/CMakeFiles/assistant.dir
-/Users/vinhpx/Workspaces/voice-command/voice-assistant/app/.cxx/Debug/2u281s1m/arm64-v8a/CMakeFiles/assistant-wakeword.dir
-/Users/vinhpx/Workspaces/voice-command/voice-assistant/app/.cxx/Debug/2u281s1m/arm64-v8a/CMakeFiles/edit_cache.dir
-/Users/vinhpx/Workspaces/voice-command/voice-assistant/app/.cxx/Debug/2u281s1m/arm64-v8a/CMakeFiles/rebuild_cache.dir

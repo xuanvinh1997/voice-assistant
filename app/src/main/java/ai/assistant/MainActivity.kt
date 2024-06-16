@@ -1,144 +1,48 @@
 package ai.assistant
 
-import ai.assistant.llm.GenAIException
-import ai.assistant.llm.GenAIWrapper
-import ai.assistant.llm.ModelDownloader.DownloadCallback
-import ai.assistant.llm.ModelDownloader.downloadModel
+import ai.assistant.service.ASR
+import ai.assistant.service.IAssistantListener
 import ai.assistant.service.RedirectService
-import android.annotation.SuppressLint
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
-import android.view.View
-import android.widget.EditText
-import android.widget.ImageButton
-import android.widget.TextView
-import android.widget.Toast
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
-import java.io.File
-import java.util.Arrays
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
+import androidx.lifecycle.ViewModelProvider
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 
 
-class MainActivity : AppCompatActivity(), GenAIWrapper.TokenUpdateListener {
+class MainActivity : AppCompatActivity(), IAssistantListener {
 
     private val OVERLAY_PERMISSION_REQUEST_CODE = 1
-    private val REQUEST_RECORD_AUDIO_PERMISSION:Int = 200
-    private var genAIWrapper: GenAIWrapper? = null
-    private val permissions = arrayOf(android.Manifest.permission.RECORD_AUDIO)
-    private var userMsgEdt: EditText? = null
-    private var sendMsgIB: ImageButton? = null
-    private var generatedTV: TextView? = null
-    private var promptTV: TextView? = null
-    private fun fileExists(context: Context, fileName: String): Boolean {
-        val file = File(context.filesDir, fileName)
-        return file.exists()
-    }
-    @Throws(GenAIException::class)
-    private fun downloadModels(context: Context) {
-        val urlFilePairs = Arrays.asList(
-            Pair(
-                "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-onnx/resolve/main/cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4/added_tokens.json?download=true",
-                "added_tokens.json"
-            ),
-            Pair(
-                "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-onnx/resolve/main/cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4/config.json?download=true",
-                "config.json"
-            ),
-            Pair(
-                "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-onnx/resolve/main/cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4/configuration_phi3.py?download=true",
-                "configuration_phi3.py"
-            ),
-            Pair(
-                "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-onnx/resolve/main/cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4/genai_config.json?download=true",
-                "genai_config.json"
-            ),
-            Pair(
-                "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-onnx/resolve/main/cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4/phi3-mini-4k-instruct-cpu-int4-rtn-block-32-acc-level-4.onnx?download=true",
-                "phi3-mini-4k-instruct-cpu-int4-rtn-block-32-acc-level-4.onnx"
-            ),
-            Pair(
-                "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-onnx/resolve/main/cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4/phi3-mini-4k-instruct-cpu-int4-rtn-block-32-acc-level-4.onnx.data?download=true",
-                "phi3-mini-4k-instruct-cpu-int4-rtn-block-32-acc-level-4.onnx.data"
-            ),
-            Pair(
-                "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-onnx/resolve/main/cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4/special_tokens_map.json?download=true",
-                "special_tokens_map.json"
-            ),
-            Pair(
-                "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-onnx/resolve/main/cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4/tokenizer.json?download=true",
-                "tokenizer.json"
-            ),
-            Pair(
-                "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-onnx/resolve/main/cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4/tokenizer.model?download=true",
-                "tokenizer.model"
-            ),
-            Pair(
-                "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-onnx/resolve/main/cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4/tokenizer_config.json?download=true",
-                "tokenizer_config.json"
-            )
-        )
-        Toast.makeText(
-            this,
-            "Downloading model for the app... Model Size greater than 2GB, please allow a few minutes to download.",
-            Toast.LENGTH_SHORT
-        ).show()
+    private val REQUEST_RECORD_AUDIO_PERMISSION: Int = 200
+    private lateinit var messageAdapter: MessageAdapter
 
-        val executor: ExecutorService = Executors.newSingleThreadExecutor()
-        for (i in urlFilePairs.indices) {
-            val index = i
-            val url = urlFilePairs[index].first
-            val fileName = urlFilePairs[index].second
-            if (fileExists(context, fileName)) {
-                // Display a message using Toast
-                Toast.makeText(this, "File already exists. Skipping Download.", Toast.LENGTH_SHORT)
-                    .show()
+    //    private lateinit var messagesViewModel: MessagesViewModel
+    private var isLoading = false
+    private var isLastPage = false
+    private val permissions = arrayOf(
+        android.Manifest.permission.RECORD_AUDIO,
+        android.Manifest.permission.SYSTEM_ALERT_WINDOW
+    )
 
-                Log.d(TAG, "File $fileName already exists. Skipping download.")
-                // note: since we always download the files lists together for once,
-                // so assuming if one filename exists, then the download model step has already
-                // be
-                // done.
-                genAIWrapper = createGenAIWrapper()
-                break
-            }
-            executor.execute {
-                downloadModel(context, url, fileName, object : DownloadCallback {
-                    @Throws(GenAIException::class)
-                    override fun onDownloadComplete() {
-                        Log.d(TAG, "Download complete for $fileName")
-                        if (index == urlFilePairs.size - 1) {
-                            // Last download completed, create GenAIWrapper
-                            genAIWrapper = createGenAIWrapper()
-                            Log.d(TAG, "All downloads completed")
-                        }
-                    }
-                })
-            }
-        }
-        executor.shutdown()
-    }
+    private lateinit var asr: ASR
+    private lateinit var recyclerView: RecyclerView
+    private var botIncomingMessage: MutableList<Message> = mutableListOf()
+    private var messageList = ArrayList<Message>()
+
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        ActivityCompat.requestPermissions(this, permissions, REQUEST_RECORD_AUDIO_PERMISSION)
-
-        try {
-            downloadModels(
-                applicationContext
-            )
-        } catch (e: GenAIException) {
-            throw RuntimeException(e)
-        }
-
-        sendMsgIB = findViewById(R.id.idIBSend);
-        userMsgEdt = findViewById(R.id.idEdtMessage);
-        generatedTV = findViewById(R.id.sample_text);
-        promptTV = findViewById(R.id.user_text);
+        ActivityCompat.requestPermissions(this, permissions, PackageManager.PERMISSION_GRANTED)
+        asr = ASR(this)
+        asr.start()
+        asr.setAssistantListener(this)
 //
 //        // click button map
 //        findViewById<android.widget.Button>(R.id.use_go_to_map_button).setOnClickListener {
@@ -160,58 +64,35 @@ class MainActivity : AppCompatActivity(), GenAIWrapper.TokenUpdateListener {
 //            openRedirectService("0966913714", "call")
 //        }
 
-        // adding on click listener for send message button.
-        sendMsgIB!!.setOnClickListener(View.OnClickListener { // Checking if the message entered
-            // by user is empty or not.
-            if (userMsgEdt!!.text.toString().isEmpty()) {
-                // if the edit text is empty display a toast message.
-                Toast.makeText(this@MainActivity, "Please enter your message..", Toast.LENGTH_SHORT)
-                    .show()
-                return@OnClickListener
-            }
+        recyclerView = findViewById(R.id.recyclerView)
+        val layoutManager = LinearLayoutManager(this)
+        recyclerView.layoutManager = layoutManager
 
-            val promptQuestion = userMsgEdt!!.text.toString()
-            val promptQuestion_formatted =
-                "<|user|>\n$promptQuestion<|end|>\n<|assistant|>"
-            Log.i("GenAI: prompt question", promptQuestion_formatted)
-            setVisibility()
+        messageAdapter = MessageAdapter(messageList)
+        recyclerView.adapter = messageAdapter
 
-            // Disable send button while responding to prompt.
-            sendMsgIB!!.isEnabled = false
 
-            promptTV!!.text = promptQuestion
-            // Clear Edit Text or prompt question.
-            userMsgEdt!!.setText("")
-            generatedTV!!.text = ""
-            Thread {
-                try {
-                    genAIWrapper!!.run(promptQuestion_formatted)
-                } catch (e: GenAIException) {
-                    throw java.lang.RuntimeException(e)
-                }
-                runOnUiThread {
-                    sendMsgIB!!.isEnabled = true
-                }
-            }.start()
-        })
-    }
-    @Throws(GenAIException::class)
-    private fun createGenAIWrapper(): GenAIWrapper {
-        // Create GenAIWrapper object and load model from android device file path.
-        val wrapper = GenAIWrapper(filesDir.path)
-        wrapper.setTokenUpdateListener(this)
-        return wrapper
+//        recyclerView.addOnScrollListener(object : InfiniteScrollListener(layoutManager) {
+//            override fun loadMoreItems() {
+//                isLoading = true
+//            }
+//
+//            override fun isLastPage(): Boolean = isLastPage
+//
+//            override fun isLoading(): Boolean = isLoading
+//        })
+//
+//        messagesViewModel.messages.observe(this) { newMessages ->
+//            messageAdapter.addMessages(newMessages)
+//            isLoading = false
+//            // Check if it's the last page and update isLastPage accordingly
+//        }
+//
+//        // Initial load
+//        messagesViewModel.loadMoreMessages()
+
     }
 
-    @SuppressLint("SetTextI18n")
-    override fun onTokenUpdate(token: String?) {
-        runOnUiThread {
-            // Update and aggregate the generated text and write to text box.
-            val generated = generatedTV!!.text
-            generatedTV!!.setText("$generated$token")
-            generatedTV!!.invalidate()
-        }
-    }
 
     override fun onRequestPermissionsResult(
         requestCode: Int, permissions: Array<String>, grantResults: IntArray
@@ -251,12 +132,29 @@ class MainActivity : AppCompatActivity(), GenAIWrapper.TokenUpdateListener {
         }
         startService(serviceIntent)
     }
-    fun setVisibility() {
-        val view = findViewById<View>(R.id.user_text) as TextView
-        view.visibility = View.VISIBLE
-        val botView = findViewById<View>(R.id.sample_text) as TextView
-        botView.visibility = View.VISIBLE
+
+    override fun onDestroy() {
+        super.onDestroy()
+        asr.stop()
     }
 
+    override fun onNewMessageSent(message: Message) {
+        Log.d(TAG, "onNewMessageSent: ${message.text} ${message.isUser}")
+        if (message.isUser)
+            messageAdapter.addMessages(message)
+        else {
+            val lastMessage = messageAdapter.getMessage(messageAdapter.itemCount - 1)
+            if (!lastMessage.isUser) {
+                lastMessage.text += message.text
+            }else {
+                messageAdapter.addMessages(message)
+            }
+        }
+
+        // refresh the recycler view
+        recyclerView.smoothScrollToPosition(0)
+        recyclerView.adapter!!.notifyItemChanged(messageAdapter.itemCount-1)
+
+    }
 }
 

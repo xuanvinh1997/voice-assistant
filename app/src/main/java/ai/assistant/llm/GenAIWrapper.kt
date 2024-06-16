@@ -41,7 +41,7 @@ class GenAIWrapper(modelPath: String) : AutoCloseable {
     }
 
     fun gotNextToken(token: String) {
-        Log.i("GenAI", "gotNextToken: $token")
+//        Log.i("GenAI", "gotNextToken: $token")
         if (listener != null) {
             listener!!.onTokenUpdate(token)
         }

@@ -36,6 +36,7 @@ class WakeWord(context: Context) {
 
 
     fun invoke(x: ShortArray): Boolean {
+        // Extract features from audio
         audioFeatures.streamingFeatures(x)
         val features = audioFeatures.getFeatures()
         if(features.isEmpty()) {
@@ -43,7 +44,7 @@ class WakeWord(context: Context) {
         }
         val prediction = infer(features)
         if (prediction > 0.3) {
-            Log.d("WakeWord", "Prediction: $prediction")
+            Log.d("WakeWord", "Wake word detected with confidence $prediction")
             return true
         }
         return false

@@ -1,1 +1,0 @@
-/Users/vinhpx/Workspaces/voice-command/voice-assistant/app/build/intermediates/cxx/Debug/2u281s1m/obj/arm64-v8a

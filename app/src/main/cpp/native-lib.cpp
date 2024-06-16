@@ -50,6 +50,7 @@ extern "C" JNIEXPORT jlong  JNICALL
 Java_ai_assistant_llm_GenAIWrapper_loadModel(JNIEnv *env, jobject thiz, jstring model_path) {
     CString path{env, model_path};
     OgaModel *model = nullptr;
+
     OgaResult *result = OgaCreateModel(path, &model);
 
     ThrowIfError(env, result);
@@ -108,7 +109,7 @@ Java_ai_assistant_llm_GenAIWrapper_run(JNIEnv *env, jobject thiz, jlong native_m
     check_result(OgaCreateGeneratorParams(model, &generator_params));
     GeneratorParamsPtr gp_cleanup{generator_params, OgaDestroyGeneratorParams};
 
-    check_result(OgaGeneratorParamsSetSearchNumber(generator_params, "max_length", 120));
+    check_result(OgaGeneratorParamsSetSearchNumber(generator_params, "max_length", 256));
     check_result(OgaGeneratorParamsSetInputSequences(generator_params, sequences));
 
     __android_log_print(ANDROID_LOG_DEBUG, "native", "starting token generation");

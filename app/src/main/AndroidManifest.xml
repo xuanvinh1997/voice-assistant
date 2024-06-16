@@ -8,6 +8,11 @@
 
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.INTERNAL_SYSTEM_WINDOW"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
@@ -23,10 +28,17 @@
         android:theme="@style/Theme.SpeechRecognition"
         tools:targetApi="31">
         <service
-            android:name=".service.ASRService"
+            android:name=".service.ASR"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.ASRService" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".llm.OverlayService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.OverlayService" />
             </intent-filter>
         </service>
         <service

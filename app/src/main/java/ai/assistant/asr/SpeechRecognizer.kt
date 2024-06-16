@@ -15,6 +15,7 @@ class SpeechRecognizer(modelPath: String) : AutoCloseable {
         val sessionOptions = OrtSession.SessionOptions()
         sessionOptions.addNnapi()
         sessionOptions.registerCustomOpLibrary(OrtxPackage.getLibraryPath())
+        sessionOptions.setInterOpNumThreads(2)
 
         session = env.createSession(modelPath, sessionOptions)
 
