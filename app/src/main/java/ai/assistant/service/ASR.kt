@@ -9,6 +9,9 @@ import ai.assistant.asr.SpeechRecognizer
 import ai.assistant.asr.WakeWord
 import ai.assistant.asr.tensorShape
 import ai.assistant.llm.LLM
+import ai.assistant.tts.SpeechSynthesis
+import ai.assistant.tts.Voice
+import ai.assistant.tts.VoiceSettings
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtException
@@ -17,15 +20,21 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioRecord
+import android.media.MediaPlayer
 import android.media.MediaRecorder
+import android.net.Uri
+import android.preference.PreferenceManager
+import android.speech.tts.SynthesisCallback
 import android.util.Log
 import androidx.core.app.ActivityCompat
+import com.k2fsa.sherpa.onnx.tts.engine.TtsEngine
+import java.io.File
 import java.nio.FloatBuffer
 import java.util.concurrent.Executors
+import kotlin.math.min
 
 
-class ASR(context: Context): IAssistantListener {
-
+class ASR(context: Context) : IAssistantListener {
     private val mContext = context
     private var audioRecord: AudioRecord? = null
     private val sampleRate = 16000
@@ -44,6 +53,7 @@ class ASR(context: Context): IAssistantListener {
     fun setAssistantListener(listener: IAssistantListener) {
         assistantListener = listener
     }
+
     private lateinit var speechRecognizer: SpeechRecognizer
 
 
@@ -59,8 +69,7 @@ class ASR(context: Context): IAssistantListener {
 
     // 30 seconds of audio at 16kHz
     private val maxBufferSize = 30 * sampleRate
-
-
+    private val ttsCallback: SynthesisCallback? = null
     private var audioData: FloatArray = FloatArray(0)
 
 
@@ -69,7 +78,19 @@ class ASR(context: Context): IAssistantListener {
         llm.downloadModels(mContext)
         llm.setAsrIAssistantListener(this)
 
-
+//        val audio = TtsEngine.tts!!.generate(
+//            text = "Hello world",
+//            sid = TtsEngine.speakerId,
+//            speed = TtsEngine.speed,
+//        )
+//        val tmp = File.createTempFile("tmp", ".wav")
+//        audio.save(tmp.path)
+////        val mediaPlayer = MediaPlayer()
+//        val mediaPlayer = MediaPlayer.create(
+//            mContext,
+//            Uri.fromFile(tmp)
+//        )
+//        mediaPlayer?.start()
         // Initialize the Voice Activity Detector
         try {
             vadDetector = SileroVadDetector(
@@ -223,9 +244,9 @@ class ASR(context: Context): IAssistantListener {
         // important to close the input tensor
         input.close()
         Log.d("ASRService", "Recognized text in ${result.inferenceTimeInMs}")
-        if (llm.isGenerating()) {
-            llm.stopCurrentRunningThread()
-        }
+//        if (llm.isGenerating()) {
+//            llm.stopCurrentRunningThread()
+//        }
         val promptQuestionFormatted = """
             ${"<|user|>\n${result.text}"}<|end|>
             <|assistant|>

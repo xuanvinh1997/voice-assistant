@@ -17,7 +17,8 @@ android {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         externalNativeBuild {
             cmake {
-        arguments "-DANDROID_STL=c++_shared"
+                arguments "-DUSE_ASYNC:BOOL=OFF", "-DUSE_MBROLA:BOOL=OFF"
+                targets "ttsespeak", "espeak-data", "assistant"
             }
 
         }

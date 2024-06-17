@@ -11,9 +11,10 @@ import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
-import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.k2fsa.sherpa.onnx.tts.engine.TtsEngine
+import java.io.File
 
 
 class MainActivity : AppCompatActivity(), IAssistantListener {
@@ -30,19 +31,26 @@ class MainActivity : AppCompatActivity(), IAssistantListener {
         android.Manifest.permission.SYSTEM_ALERT_WINDOW
     )
 
+    private var mediaPlayer: android.media.MediaPlayer? = null
     private lateinit var asr: ASR
     private lateinit var recyclerView: RecyclerView
     private var botIncomingMessage: MutableList<Message> = mutableListOf()
     private var messageList = ArrayList<Message>()
-
+    private var textChunks = ArrayList<String>()
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         ActivityCompat.requestPermissions(this, permissions, PackageManager.PERMISSION_GRANTED)
+        if (TtsEngine.tts == null) {
+            TtsEngine.createTts(applicationContext)
+        }
+
         asr = ASR(this)
         asr.start()
         asr.setAssistantListener(this)
+
+
 //
 //        // click button map
 //        findViewById<android.widget.Button>(R.id.use_go_to_map_button).setOnClickListener {
@@ -137,12 +145,13 @@ class MainActivity : AppCompatActivity(), IAssistantListener {
         super.onDestroy()
         asr.stop()
     }
-
+    val regex = Regex("""(\.\.\.|[.?!])""")
     override fun onNewMessageSent(message: Message) {
         Log.d(TAG, "onNewMessageSent: ${message.text} ${message.isUser}")
         if (message.isUser)
             messageAdapter.addMessages(message)
         else {
+            textChunks.add(message.text)
             val lastMessage = messageAdapter.getMessage(messageAdapter.itemCount - 1)
             if (!lastMessage.isUser) {
                 lastMessage.text += message.text
@@ -150,7 +159,16 @@ class MainActivity : AppCompatActivity(), IAssistantListener {
                 messageAdapter.addMessages(message)
             }
         }
+        if (message.text.contains(regex)) {
+            val audio = TtsEngine.tts!!.generate(textChunks.joinToString(" "), TtsEngine.speakerId, TtsEngine.speed)
+            mediaPlayer?.stop()
+            val tmp = File.createTempFile("tmp", ".wav")
+            audio.save(tmp.path)
+            mediaPlayer = android.media.MediaPlayer.create(this, android.net.Uri.fromFile(tmp))
+            mediaPlayer?.start()
+            textChunks.clear()
 
+        }
         // refresh the recycler view
         recyclerView.smoothScrollToPosition(0)
         recyclerView.adapter!!.notifyItemChanged(messageAdapter.itemCount-1)
