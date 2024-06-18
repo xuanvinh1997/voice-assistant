@@ -11,14 +11,8 @@ cmake_minimum_required(VERSION 3.22.1)
 # build script scope).
 project("assistant")
 
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../../../.. espeak-ng)
+#add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../../../.. espeak-ng)
 
-add_custom_target(
-        espeak-data
-        COMMAND ${CMAKE_COMMAND} -B${CMAKE_CURRENT_BINARY_DIR}/../espeak-data ${CMAKE_CURRENT_SOURCE_DIR}/../../../../..
-        COMMAND ${CMAKE_COMMAND} --build ${CMAKE_CURRENT_BINARY_DIR}/../espeak-data --target data
-        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_BINARY_DIR}/../espeak-data/espeak-ng-data ${CMAKE_SOURCE_DIR}/../build/generated/espeak-ng-data
-)
 #set(APP_LIB_DIR ${PROJECT_SOURCE_DIR}/../../../libs)
 
 # Creates and names a library, sets it as either STATIC
@@ -51,16 +45,3 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
         log)
 
 
-message(STATUS "Data: ${CMAKE_CURRENT_SOURCE_DIR}")
-
-find_library(A_LOG log)
-
-add_library(ttsespeak SHARED
-        eSpeakService.c
-)
-target_include_directories(ttsespeak PRIVATE
-        include
-)
-target_link_libraries(ttsespeak PRIVATE
-        espeak-ng ${A_LOG}
-)
