@@ -1,6 +1,7 @@
 package ai.assistant
 
-import ai.assistant.service.IAssistantListener
+import ai.assistant.service.ASRService
+import ai.assistant.service.LLMService
 import ai.assistant.service.RedirectService
 import ai.assistant.service.TtsService
 import ai.assistant.service.WakeWordService
@@ -24,7 +25,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 
 
-class MainActivity : AppCompatActivity(), IAssistantListener, TextToSpeech.OnInitListener {
+class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private val OVERLAY_PERMISSION_REQUEST_CODE = 1
     private val REQUEST_RECORD_AUDIO_PERMISSION: Int = 200
@@ -40,6 +41,7 @@ class MainActivity : AppCompatActivity(), IAssistantListener, TextToSpeech.OnIni
     )
     private var isBound = false
     private lateinit var wakeWordService: WakeWordService
+    private lateinit var asrService: ASRService
     private lateinit var recyclerView: RecyclerView
     private var botIncomingMessage: MutableList<Message> = mutableListOf()
     private var messageList = ArrayList<Message>()
@@ -68,7 +70,48 @@ class MainActivity : AppCompatActivity(), IAssistantListener, TextToSpeech.OnIni
 //            isBound = false
         }
     }
+
+    private val asrConnection = object : ServiceConnection {
+        override fun onServiceConnected(className: ComponentName, service: IBinder) {
+            val binder = service as ASRService.LocalBinder
+            asrService = binder.getService()
+            pipeline.addListener(asrService)
+//            isBound = true
+        }
+        override fun onServiceDisconnected(arg0: ComponentName) {
+//            isBound = false
+        }
+    }
+    private lateinit var llmService: LLMService
+    private val llmConnection = object : ServiceConnection {
+        override fun onServiceConnected(className: ComponentName, service: IBinder) {
+            val binder = service as LLMService.LocalBinder
+            llmService = binder.getService()
+//            isBound = true
+        }
+        override fun onServiceDisconnected(arg0: ComponentName) {
+//            isBound = false
+        }
+    }
+
     private lateinit var tts: TextToSpeech
+    private val messageReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+
+            val message = intent?.getStringExtra("message")
+            messageAdapter.addMessages(Message(message!!, false))
+            tts.speak(message, TextToSpeech.QUEUE_FLUSH, null, null)
+        }
+    }
+
+    private val userMessageReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val message = intent?.getStringExtra("message")
+            messageAdapter.addMessages(Message(message!!, true))
+//            llmService.runInference(message)
+        }
+    }
+
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -76,12 +119,20 @@ class MainActivity : AppCompatActivity(), IAssistantListener, TextToSpeech.OnIni
         ActivityCompat.requestPermissions(this, permissions, PackageManager.PERMISSION_GRANTED)
 
         // Initialize TextToSpeech and set the listener to 'this'
-        tts = TextToSpeech(this, this, "package ai.assistant.service.TtsService")
-        val intent = Intent(this, TtsService::class.java)
-        bindService(intent, connection, Context.BIND_AUTO_CREATE)
-        val wakeWordService = Intent(this, WakeWordService::class.java)
-        startService(wakeWordService)
-        bindService(wakeWordService, wakeWordConnection, Context.BIND_AUTO_CREATE)
+        tts = TextToSpeech(this, this, "ai.assistant.service.TtsService")
+        // text to speech
+        val ttsIntent = Intent(this, TtsService::class.java)
+        bindService(ttsIntent, connection, Context.BIND_AUTO_CREATE)
+        // wakeword
+        val wakeWordIntent = Intent(this, WakeWordService::class.java)
+        bindService(wakeWordIntent, wakeWordConnection, Context.BIND_AUTO_CREATE)
+        // asr
+        val asrIntent = Intent(this, ASRService::class.java)
+        bindService(asrIntent, asrConnection, Context.BIND_AUTO_CREATE)
+        // llm
+        val llmIntent = Intent(this, LLMService::class.java)
+        bindService(llmIntent, llmConnection, Context.BIND_AUTO_CREATE)
+
         // start pipeline
         pipeline = Pipeline(applicationContext)
 
@@ -90,6 +141,13 @@ class MainActivity : AppCompatActivity(), IAssistantListener, TextToSpeech.OnIni
 
         val filter = IntentFilter(Events.KWS_DETECTED)
         LocalBroadcastManager.getInstance(this).registerReceiver(receiver, filter)
+
+        val filter2 = IntentFilter(Events.ON_ASSISTANT_MESSAGE)
+        LocalBroadcastManager.getInstance(this).registerReceiver(messageReceiver, filter2)
+
+        val filter3 = IntentFilter(Events.ON_USER_MESSAGE)
+        LocalBroadcastManager.getInstance(this).registerReceiver(userMessageReceiver, filter3)
+
         recyclerView = findViewById(R.id.recyclerView)
         val layoutManager = LinearLayoutManager(this)
         recyclerView.layoutManager = layoutManager
@@ -145,7 +203,7 @@ class MainActivity : AppCompatActivity(), IAssistantListener, TextToSpeech.OnIni
             // Handle the event
 //            val value = intent.getStringExtra("key")
 //            Log.d("WakeWordService", "Received event with value $value")
-            tts.speak("Chào bạn", TextToSpeech.QUEUE_FLUSH, null, null)
+//            tts.speak("Chào bạn", TextToSpeech.QUEUE_FLUSH, null, null)
         }
     }
     override fun onDestroy() {
@@ -155,44 +213,16 @@ class MainActivity : AppCompatActivity(), IAssistantListener, TextToSpeech.OnIni
             isBound = false
         }
         unbindService(wakeWordConnection)
+        unbindService(asrConnection)
+        unbindService(llmConnection)
+//        stopService(asr)
         pipeline.stopRecording()
-    }
-    val regex = Regex("""(\.\.\.|[.?!])""")
-    override fun onNewMessageSent(message: Message) {
-        Log.d(TAG, "onNewMessageSent: ${message.text} ${message.isUser}")
-        if (message.isUser)
-            messageAdapter.addMessages(message)
-        else {
-            textChunks.add(message.text)
-            val lastMessage = messageAdapter.getMessage(messageAdapter.itemCount - 1)
-            if (!lastMessage.isUser) {
-                lastMessage.text += message.text
-            }else {
-                messageAdapter.addMessages(message)
-            }
-        }
-        if (message.text.contains(regex)) {
-            val text = textChunks.joinToString(" ")
-            tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
-            textChunks.clear()
-        }
-//            val audio = TtsEngine.tts!!.generate(textChunks.joinToString(" "), TtsEngine.speakerId, TtsEngine.speed)
-//            mediaPlayer?.stop()
-//            val tmp = File.createTempFile("tmp", ".wav")
-//            audio.save(tmp.path)
-//            // Set the data source using a ByteArrayInputStream
-//            mediaPlayer = android.media.MediaPlayer.create(this, android.net.Uri.fromFile(tmp))
-//            mediaPlayer?.start()
-//            textChunks.clear()
-
-        // refresh the recycler view
-        recyclerView.smoothScrollToPosition(0)
-        recyclerView.adapter!!.notifyItemChanged(messageAdapter.itemCount-1)
-
     }
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
+            tts.setLanguage(java.util.Locale.US)
+
             Log.d("TTS", "Initialization Success!")
         } else {
             Log.e("TTS", "Initialization Failed!")

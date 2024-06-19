@@ -44,6 +44,18 @@
 
         </service>
         <service
+            android:name="ai.assistant.service.ASRService"
+            android:exported="true"
+            >
+
+        </service>
+        <service
+            android:name="ai.assistant.service.LLMService"
+            android:exported="true"
+            >
+
+        </service>
+        <service
             android:name=".service.RedirectService"
             android:exported="false" />
 

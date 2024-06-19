@@ -1,30 +1,64 @@
-package ai.assistant.llm
+package ai.assistant.service
 
+import ai.assistant.Events
 import ai.assistant.MainActivity
-import ai.assistant.Message
-import ai.assistant.R
-import ai.assistant.service.IAssistantListener
+import ai.assistant.llm.GenAIException
+import ai.assistant.llm.GenAIWrapper
+import ai.assistant.llm.ModelDownloader
 import android.annotation.SuppressLint
+import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.Binder
+import android.os.IBinder
 import android.util.Log
 import android.widget.Toast
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import java.io.File
 import java.util.Arrays
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
+import java.util.concurrent.FutureTask
 
-
-class LLM(context: Context): GenAIWrapper.TokenUpdateListener {
-
-    private val mContext = context
+class LLMService:Service(), GenAIWrapper.TokenUpdateListener {
     private var isRunning = false
-    private lateinit var runningThread: Future<*>
+    private var runningThread: Future<*> = FutureTask<Any?> { null }
     private var genAIWrapper: GenAIWrapper? = null
-    private var asrIAssistantListener: IAssistantListener? = null
     private var messageResponse = ""
     private val timeOutMs = 1000 // 1 second
     private var lastMessageTime = 0L
+    private val binder = LocalBinder()
+    private val executor: ExecutorService = Executors.newSingleThreadExecutor()
+    inner class LocalBinder : Binder() {
+        fun getService(): LLMService = this@LLMService
+    }
+
+
+
+    private val receiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val data = intent?.getStringExtra("message")
+            Log.d("LLMService", "Received message: $data")
+            if(isGenerating()) {
+                stopCurrentRunningThread()
+            }
+            runInference(data!!)
+        }
+    }
+    override fun onCreate() {
+        super.onCreate()
+        downloadModels()
+        val filter = IntentFilter(Events.ON_USER_MESSAGE)
+        LocalBroadcastManager.getInstance(this).registerReceiver(receiver, filter)
+        Log.d("LLMService", "Service started")
+    }
+    override fun onBind(p0: Intent?): IBinder? {
+        return binder
+    }
+
     private fun fileExists(context: Context, fileName: String): Boolean {
         val file = File(context.filesDir, fileName)
         return file.exists()
@@ -33,21 +67,22 @@ class LLM(context: Context): GenAIWrapper.TokenUpdateListener {
     @Throws(GenAIException::class)
     private fun createGenAIWrapper(): GenAIWrapper {
         // Create GenAIWrapper object and load model from android device file path.
-        val wrapper = GenAIWrapper(mContext.filesDir.path)
+        val wrapper = GenAIWrapper(this.filesDir.path)
         wrapper.setTokenUpdateListener(this)
         return wrapper
     }
-    fun setAsrIAssistantListener(listener: IAssistantListener) {
-        asrIAssistantListener = listener
-    }
+
     fun runInference(input: String) {
-        runningThread = Executors.newSingleThreadExecutor().submit {
+        runningThread = executor.submit {
             genAIWrapper!!.run(input)
         }
     }
 
+    private fun isTimeOut(): Boolean {
+        return System.currentTimeMillis() - lastMessageTime > timeOutMs
+    }
     @Throws(GenAIException::class)
-    fun downloadModels(context: Context) {
+    fun downloadModels() {
         val urlFilePairs = Arrays.asList(
             Pair(
                 "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-onnx/resolve/main/cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4/added_tokens.json?download=true",
@@ -91,7 +126,7 @@ class LLM(context: Context): GenAIWrapper.TokenUpdateListener {
             )
         )
         Toast.makeText(
-            mContext,
+            this,
             "Downloading model for the app... Model Size greater than 2GB, please allow a few minutes to download.",
             Toast.LENGTH_SHORT
         ).show()
@@ -101,9 +136,9 @@ class LLM(context: Context): GenAIWrapper.TokenUpdateListener {
             val index = i
             val url = urlFilePairs[index].first
             val fileName = urlFilePairs[index].second
-            if (fileExists(context, fileName)) {
+            if (fileExists(this, fileName)) {
                 // Display a message using Toast
-                Toast.makeText(mContext, "File already exists. Skipping Download.", Toast.LENGTH_SHORT)
+                Toast.makeText(this, "File already exists. Skipping Download.", Toast.LENGTH_SHORT)
                     .show()
 
                 Log.d(MainActivity.TAG, "File $fileName already exists. Skipping download.")
@@ -116,7 +151,7 @@ class LLM(context: Context): GenAIWrapper.TokenUpdateListener {
             }
             executor.execute {
                 ModelDownloader.downloadModel(
-                    context,
+                    this,
                     url,
                     fileName,
                     object : ModelDownloader.DownloadCallback {
@@ -139,27 +174,39 @@ class LLM(context: Context): GenAIWrapper.TokenUpdateListener {
     }
 
     fun isGenerating(): Boolean {
+        if (runningThread == null) {
+            return false
+        }
         return !runningThread.isDone && !runningThread.isCancelled
     }
 
     fun stopCurrentRunningThread() {
         runningThread.cancel(true)
     }
+    private val stopSentenceRegex = ".*[.!?]".toRegex()
 
     @SuppressLint("SetTextI18n")
     override fun onTokenUpdate(token: String?) {
         lastMessageTime = System.currentTimeMillis()
-        // Update and aggregate the generated text and write to text box.
-//        Log.i("GenAI", "onTokenUpdate: $token")
-        asrIAssistantListener!!.onNewMessageSent(Message(token!!, false))
         // Update the messageResponse with the token
         messageResponse += token
 
+        // Check if the token is a stop sentence
+        if (stopSentenceRegex.matches(token!!)) {
+            // Send the message to the MainActivity
+            val intent = Intent(Events.ON_ASSISTANT_MESSAGE)
+            intent.putExtra("message", messageResponse)
+            LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
+            messageResponse = ""
+        }
+//        val intent = Intent(Events.ON_MESSAGE_GENERATED)
+//        intent.putExtra("message", token)
+//        LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
     }
-
-    fun terminate() {
+    override fun onDestroy() {
+        super.onDestroy()
         isRunning = false
         genAIWrapper!!.close()
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(receiver)
     }
-
 }

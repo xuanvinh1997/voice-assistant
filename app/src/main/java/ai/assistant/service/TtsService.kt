@@ -71,7 +71,7 @@ class TtsService : TextToSpeechService() {
         super.onCreate()
 
         // see https://github.com/Miserlou/Android-SDK-Samples/blob/master/TtsEngine/src/com/example/android/ttsengine/RobotSpeakTtsService.java#L68
-        onLoadLanguage(TtsEngine.lang, "", "")
+//        onLoadLanguage(TtsEngine.lang, "", "")
     }
 
     override fun onDestroy() {
