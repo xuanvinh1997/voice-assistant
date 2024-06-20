@@ -2,6 +2,7 @@ package ai.assistant.llm
 
 import android.content.Context
 import android.util.Log
+import android.widget.Toast
 import androidx.constraintlayout.helper.widget.MotionEffect
 import java.io.File
 import java.io.FileOutputStream
@@ -23,7 +24,6 @@ object ModelDownloader {
             val modelUrl = URL(url)
             val connection = modelUrl.openConnection() as HttpURLConnection
             connection.connect()
-
             // Check if response code is OK
             if (connection.responseCode == HttpURLConnection.HTTP_OK) {
                 val inputStream = connection.inputStream

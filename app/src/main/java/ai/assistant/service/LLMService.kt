@@ -23,38 +23,58 @@ import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import java.util.concurrent.FutureTask
 
-class LLMService:Service(), GenAIWrapper.TokenUpdateListener {
+
+class LLMService() : Service(), GenAIWrapper.TokenUpdateListener {
     private var isRunning = false
     private var runningThread: Future<*> = FutureTask<Any?> { null }
     private var genAIWrapper: GenAIWrapper? = null
-    private var messageResponse = ""
+    private var messageResponse = mutableListOf("")
     private val timeOutMs = 1000 // 1 second
     private var lastMessageTime = 0L
     private val binder = LocalBinder()
-    private val executor: ExecutorService = Executors.newSingleThreadExecutor()
+//    private lateinit var serviceScope: CoroutineScope
+//    private val llamaAndroid: LLamaAndroid = LLamaAndroid.instance()
+
     inner class LocalBinder : Binder() {
         fun getService(): LLMService = this@LLMService
     }
 
-
-
+    //    private lateinit var serviceJob: Job
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             val data = intent?.getStringExtra("message")
             Log.d("LLMService", "Received message: $data")
-            if(isGenerating()) {
+            if (isGenerating()) {
                 stopCurrentRunningThread()
             }
+//            CoroutineScope(Dispatchers.IO).launch {
             runInference(data!!)
+//            }
         }
     }
+
+    //    private suspend fun loadModel() {
+//       llamaAndroid.load(
+//           Utils.copyAssetsToInternalStorage(
+//           this,
+//           R.raw.model,
+//           "model.gguf"
+//       ))
+//    }
     override fun onCreate() {
         super.onCreate()
         downloadModels()
+//        serviceJob = Job()
+//        serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
+//
+//        serviceScope.launch {
+//            loadModel()
+//        }
         val filter = IntentFilter(Events.ON_USER_MESSAGE)
         LocalBroadcastManager.getInstance(this).registerReceiver(receiver, filter)
         Log.d("LLMService", "Service started")
     }
+
     override fun onBind(p0: Intent?): IBinder? {
         return binder
     }
@@ -73,14 +93,46 @@ class LLMService:Service(), GenAIWrapper.TokenUpdateListener {
     }
 
     fun runInference(input: String) {
-        runningThread = executor.submit {
-            genAIWrapper!!.run(input)
+//        val messages = listOf(
+//            ChatTemplate.Message("user", input),
+//        )
+//
+//        val tools = listOf(
+//            ChatTemplate.Tool("toolName", "toolDescription")
+//        )
+        runningThread = Executors.newSingleThreadExecutor().submit {
+            val promptQuestionFormatted = """
+                <|system|>You're AI Assistant in cars. You can do anything with applications and services in the car. Your response should have less than 50 words<|end|>
+                ${"<|user|>\n$input"}<|end|>
+                <|assistant|>
+                """.trimIndent()
+            genAIWrapper!!.run(promptQuestionFormatted)
         }
+//        val renderedString = ChatTemplate.render(messages, tools, toolCall = false)
+//        println(renderedString)
+
+//        val funcCall = ChatTemplate.getFuncCall("some text with prompt", "prompt")
+//        println(funcCall)
+//        llamaAndroid.send(renderedString)
+//            .catch { Log.e("LLMService", "Error: $it")}
+//            .collect {
+//                messageResponse += it
+//                Log.d("LLMService", "Generated message: $it")
+//                if (stopSentenceRegex.matches(it)) {
+//                    val intent = Intent(Events.ON_ASSISTANT_MESSAGE)
+//                    intent.putExtra("message", messageResponse)
+//                    LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
+//                    messageResponse = ""
+//                }
+//            }
+
+
     }
 
     private fun isTimeOut(): Boolean {
         return System.currentTimeMillis() - lastMessageTime > timeOutMs
     }
+
     @Throws(GenAIException::class)
     fun downloadModels() {
         val urlFilePairs = Arrays.asList(
@@ -131,6 +183,7 @@ class LLMService:Service(), GenAIWrapper.TokenUpdateListener {
             Toast.LENGTH_SHORT
         ).show()
 
+
         val executor: ExecutorService = Executors.newSingleThreadExecutor()
         for (i in urlFilePairs.indices) {
             val index = i
@@ -169,6 +222,7 @@ class LLMService:Service(), GenAIWrapper.TokenUpdateListener {
         }
         executor.shutdown()
     }
+
     fun isReady(): Boolean {
         return genAIWrapper != null
     }
@@ -183,26 +237,28 @@ class LLMService:Service(), GenAIWrapper.TokenUpdateListener {
     fun stopCurrentRunningThread() {
         runningThread.cancel(true)
     }
-    private val stopSentenceRegex = ".*[.!?]".toRegex()
+
+    private val stopSentenceRegex = ".*[.!?,;]".toRegex()
 
     @SuppressLint("SetTextI18n")
     override fun onTokenUpdate(token: String?) {
         lastMessageTime = System.currentTimeMillis()
         // Update the messageResponse with the token
-        messageResponse += token
+        messageResponse.add(token!!)
 
         // Check if the token is a stop sentence
-        if (stopSentenceRegex.matches(token!!)) {
+        if (stopSentenceRegex.matches(token)) {
             // Send the message to the MainActivity
             val intent = Intent(Events.ON_ASSISTANT_MESSAGE)
-            intent.putExtra("message", messageResponse)
+            intent.putExtra("message", messageResponse.joinToString(""))
             LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
-            messageResponse = ""
+            messageResponse.clear()
         }
 //        val intent = Intent(Events.ON_MESSAGE_GENERATED)
 //        intent.putExtra("message", token)
 //        LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
     }
+
     override fun onDestroy() {
         super.onDestroy()
         isRunning = false

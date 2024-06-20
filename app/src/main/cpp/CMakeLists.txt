@@ -11,7 +11,15 @@ cmake_minimum_required(VERSION 3.22.1)
 # build script scope).
 project("assistant")
 
-#add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../../../.. espeak-ng)
+#include(FetchContent)
+#FetchContent_Declare(
+#        llama
+#        GIT_REPOSITORY https://github.com/ggerganov/llama.cpp
+#        GIT_TAG        master
+#)
+
+# Also provides "common"
+#FetchContent_MakeAvailable(llama)
 
 #set(APP_LIB_DIR ${PROJECT_SOURCE_DIR}/../../../libs)
 
@@ -32,6 +40,10 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
         # List C/C++ source files with relative paths to this CMakeLists.txt.
         native-lib.cpp)
 
+#add_library(llama-android SHARED
+#        # List C/C++ source files with relative paths to this CMakeLists.txt.
+#        llama-android.cpp)
+
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE ${PROJECT_SOURCE_DIR}/../jniLibs/${CMAKE_ANDROID_ARCH_ABI})
 
 # Specifies libraries CMake should link to your target library. You
@@ -43,5 +55,11 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
         onnxruntime
         android
         log)
+
+#target_link_libraries(llama-android
+#        llama
+#        android
+#        common
+#        log)
 
 

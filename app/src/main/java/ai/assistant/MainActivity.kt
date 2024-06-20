@@ -99,8 +99,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         override fun onReceive(context: Context?, intent: Intent?) {
 
             val message = intent?.getStringExtra("message")
-            messageAdapter.addMessages(Message(message!!, false))
-            tts.speak(message, TextToSpeech.QUEUE_FLUSH, null, null)
+            val lastMessage = messageAdapter.getMessage(messageAdapter.itemCount - 1)
+            if(!lastMessage.isUser) {
+                lastMessage.text += " $message"
+                messageAdapter.notifyItemChanged(messageAdapter.itemCount - 1)
+            } else {
+                messageAdapter.addMessages(Message(message!!, false))
+            }
+//            messageAdapter.addMessages(Message(message!!, false))
+            tts.speak(message, TextToSpeech.QUEUE_ADD, null, null)
         }
     }
 
