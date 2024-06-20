@@ -8,7 +8,6 @@ import ai.onnxruntime.OrtSession
 import android.content.Context
 import android.util.Log
 
-
 class WakeWord(context: Context) {
     private val audioFeatures = lazy { AudioFeatures(context = context) }.value
     private val env = OrtEnvironment.getEnvironment()
