@@ -81,6 +81,8 @@ Java_ai_assistant_llm_GenAIWrapper_releaseTokenizer(JNIEnv *env, jobject thiz, j
     OgaDestroyTokenizer(tokenizer);
 }
 
+
+
 extern "C"
 JNIEXPORT jstring JNICALL
 Java_ai_assistant_llm_GenAIWrapper_run(JNIEnv *env, jobject thiz, jlong native_model, jlong native_tokenizer,
@@ -150,6 +152,7 @@ Java_ai_assistant_llm_GenAIWrapper_run(JNIEnv *env, jobject thiz, jlong native_m
         // setup the callback to GenAIWrapper::gotNextToken
         jclass genai_wrapper = env->GetObjectClass(thiz);
         jmethodID callback_id = env->GetMethodID(genai_wrapper, "gotNextToken", "(Ljava/lang/String;)V");
+        jmethodID on_finished = env->GetMethodID(genai_wrapper, "onFinished", "()V");
         const auto do_callback = [&](const char* token){
             jstring jtoken = env->NewStringUTF(token);
             env->CallVoidMethod(thiz, callback_id, jtoken);
@@ -176,6 +179,7 @@ Java_ai_assistant_llm_GenAIWrapper_run(JNIEnv *env, jobject thiz, jlong native_m
         const int32_t* tokens = OgaGenerator_GetSequenceData(generator, 0);
         size_t num_tokens = OgaGenerator_GetSequenceCount(generator, 0);
         output_text = decode_tokens(tokens, num_tokens);
+        env->CallVoidMethod(thiz, on_finished);
     }
 
     return output_text;

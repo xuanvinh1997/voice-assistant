@@ -47,6 +47,10 @@ class GenAIWrapper(modelPath: String) : AutoCloseable {
         }
     }
 
+    fun onFinished() {
+
+    }
+
     private external fun loadModel(modelPath: String): Long
 
     private external fun releaseModel(nativeModel: Long)

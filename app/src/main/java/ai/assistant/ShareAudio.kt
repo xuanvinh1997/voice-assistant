@@ -6,6 +6,9 @@ import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.media.audiofx.AcousticEchoCanceler
+import android.media.audiofx.NoiseSuppressor
+import android.util.Log
 import androidx.core.app.ActivityCompat
 
 
@@ -16,6 +19,8 @@ class SharedAudioRecorder(context: Context, sampleRate: Int, bufferSize: Int) {
     private var isRecording = false
     private val listeners: MutableList<AudioDataListener> = ArrayList()
     private val mContext = context
+    private var aec: AcousticEchoCanceler? = null
+    private var ns: NoiseSuppressor? = null
     init {
         if (ActivityCompat.checkSelfPermission(
                 mContext,
@@ -38,6 +43,11 @@ class SharedAudioRecorder(context: Context, sampleRate: Int, bufferSize: Int) {
             AudioFormat.ENCODING_PCM_16BIT,
             bufferSize
         )
+        // Initialize AcousticEchoCanceler and NoiseSuppressor
+        aec = AcousticEchoCanceler.create(audioRecord.audioSessionId)
+        ns = NoiseSuppressor.create(audioRecord.audioSessionId)
+        aec!!.setEnabled(true)
+        ns!!.setEnabled(true)
     }
     fun startRecording() {
         isRecording = true
@@ -48,6 +58,7 @@ class SharedAudioRecorder(context: Context, sampleRate: Int, bufferSize: Int) {
     fun stopRecording() {
         isRecording = false
         audioRecord.stop()
+        aec!!.release()
     }
 
     fun addListener(listener: AudioDataListener) {

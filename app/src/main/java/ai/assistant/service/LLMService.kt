@@ -28,7 +28,7 @@ class LLMService() : Service(), GenAIWrapper.TokenUpdateListener {
     private var isRunning = false
     private var runningThread: Future<*> = FutureTask<Any?> { null }
     private var genAIWrapper: GenAIWrapper? = null
-    private var messageResponse = mutableListOf("")
+//    private var messageResponse = mutableListOf("")
     private val timeOutMs = 1000 // 1 second
     private var lastMessageTime = 0L
     private val binder = LocalBinder()
@@ -100,6 +100,9 @@ class LLMService() : Service(), GenAIWrapper.TokenUpdateListener {
 //        val tools = listOf(
 //            ChatTemplate.Tool("toolName", "toolDescription")
 //        )
+        if(runningThread != null) {
+            runningThread.cancel(true)
+        }
         runningThread = Executors.newSingleThreadExecutor().submit {
             val promptQuestionFormatted = """
                 <|system|>You're AI Assistant in cars. You can do anything with applications and services in the car. Your response should have less than 50 words<|end|>
@@ -238,22 +241,18 @@ class LLMService() : Service(), GenAIWrapper.TokenUpdateListener {
         runningThread.cancel(true)
     }
 
-    private val stopSentenceRegex = ".*[.!?,;]".toRegex()
 
     @SuppressLint("SetTextI18n")
     override fun onTokenUpdate(token: String?) {
         lastMessageTime = System.currentTimeMillis()
         // Update the messageResponse with the token
-        messageResponse.add(token!!)
 
         // Check if the token is a stop sentence
-        if (stopSentenceRegex.matches(token)) {
+//        if (stopSentenceRegex.matches(token)) {
             // Send the message to the MainActivity
             val intent = Intent(Events.ON_ASSISTANT_MESSAGE)
-            intent.putExtra("message", messageResponse.joinToString(""))
+            intent.putExtra("message", token!!)
             LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
-            messageResponse.clear()
-        }
 //        val intent = Intent(Events.ON_MESSAGE_GENERATED)
 //        intent.putExtra("message", token)
 //        LocalBroadcastManager.getInstance(this).sendBroadcast(intent)

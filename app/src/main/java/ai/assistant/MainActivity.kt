@@ -95,6 +95,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private lateinit var tts: TextToSpeech
+    private val stopSentenceRegex = ".*[.!?,;]".toRegex()
+
+    private val textToSpeechQueue = mutableListOf<String>()
+
     private val messageReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
 
@@ -107,7 +111,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 messageAdapter.addMessages(Message(message!!, false))
             }
 //            messageAdapter.addMessages(Message(message!!, false))
-            tts.speak(message, TextToSpeech.QUEUE_ADD, null, null)
+            textToSpeechQueue.add(message!!)
+            if (stopSentenceRegex.matches(message)) {
+                tts.speak(textToSpeechQueue.joinToString(""), TextToSpeech.QUEUE_ADD, null, null)
+                textToSpeechQueue.clear()
+            }
         }
     }
 
