@@ -18,7 +18,7 @@ class WakeWord(context: Context) {
     init {
         sessionOptions.addNnapi()
         session = env.createSession(
-            context.resources.openRawResource(R.raw.alexa).use { it.readBytes() },
+            context.resources.openRawResource(R.raw.mo_shi_mo_shi).use { it.readBytes() },
             sessionOptions
         )
 

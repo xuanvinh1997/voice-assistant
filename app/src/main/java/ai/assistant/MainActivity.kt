@@ -216,6 +216,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private val receiver: BroadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             // Handle the event
+            messageAdapter.addMessages(Message("I'm here", false))
 //            val value = intent.getStringExtra("key")
 //            Log.d("WakeWordService", "Received event with value $value")
 //            tts.speak("Chào bạn", TextToSpeech.QUEUE_FLUSH, null, null)
