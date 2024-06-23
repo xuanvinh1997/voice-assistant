@@ -254,16 +254,20 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
                 override fun onDone(utteranceId: String?) {
                     Log.d("TTS", "onDone utteranceId=$utteranceId")
-                    if (utteranceId == this@MainActivity.utteranceId) {
-                        Log.d("TTS", "Stop floating button service")
-                        stopFloatingButtonService()
-                    }
                 }
 
                 override fun onError(utteranceId: String?) {
                     Log.e("TTS", "onError utteranceId=$utteranceId")
                 }
             })
+
+            tts.setOnUtteranceCompletedListener { utteranceId ->
+                Log.d("TTS", "onUtteranceCompleted utteranceId=$utteranceId")
+                if (utteranceId == this@MainActivity.utteranceId){
+                    Log.d("TTS", "Stop floating button service")
+                    stopFloatingButtonService()
+                }
+            }
         } else {
             Log.e("TTS", "UtteranceProgressListener is not supported on this device.")
         }

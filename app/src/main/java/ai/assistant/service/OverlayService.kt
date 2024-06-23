@@ -10,6 +10,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.ImageView
+import com.bumptech.glide.Glide
 
 class OverlayService : Service() {
 
@@ -22,15 +23,32 @@ class OverlayService : Service() {
 
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
 
+//        appButton = ImageView(this)
+//        appButton.setImageResource(R.drawable.float_button)
+//        // set size of button
+//        val buttonWidth = 150 // Chiều rộng cố định, đơn vị là pixel
+//        val buttonHeight = 150 // Chiều cao cố định, đơn vị là pixel
+//
+//        params = WindowManager.LayoutParams(
+//            buttonWidth,
+//            buttonHeight,
+//            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+//            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+//            PixelFormat.TRANSLUCENT
+//        )
+
         appButton = ImageView(this)
-        appButton.setImageResource(R.drawable.float_button)
-        // set size of button
-        val buttonWidth = 150 // Chiều rộng cố định, đơn vị là pixel
-        val buttonHeight = 150 // Chiều cao cố định, đơn vị là pixel
+        Glide.with(this)
+            .asGif()
+            .load(R.drawable.float_button)
+            .into(appButton)
+
+        // Thiết lập kích thước của nút nổi
+        val buttonSize = 150 // Kích thước mong muốn (pixels)
 
         params = WindowManager.LayoutParams(
-            buttonWidth,
-            buttonHeight,
+            buttonSize,
+            buttonSize,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
