@@ -2,6 +2,7 @@ package ai.assistant
 
 import ai.assistant.service.ASRService
 import ai.assistant.service.LLMService
+import ai.assistant.service.OverlayService
 import ai.assistant.service.RedirectService
 import ai.assistant.service.TtsService
 import ai.assistant.service.WakeWordService
@@ -16,6 +17,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
@@ -27,6 +29,7 @@ import androidx.recyclerview.widget.RecyclerView
 
 class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
+    private val utteranceId = "utteranceId"
     private val OVERLAY_PERMISSION_REQUEST_CODE = 1
     private val REQUEST_RECORD_AUDIO_PERMISSION: Int = 200
     private lateinit var messageAdapter: MessageAdapter
@@ -101,7 +104,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private val messageReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-
+            Log.d("MainActivity", "1-messageReceiver")
             val message = intent?.getStringExtra("message")
             val lastMessage = messageAdapter.getMessage(messageAdapter.itemCount - 1)
             if(!lastMessage.isUser) {
@@ -113,7 +116,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 //            messageAdapter.addMessages(Message(message!!, false))
             textToSpeechQueue.add(message!!)
             if (stopSentenceRegex.matches(message)) {
-                tts.speak(textToSpeechQueue.joinToString(""), TextToSpeech.QUEUE_ADD, null, null)
+                tts.speak(textToSpeechQueue.joinToString(""), TextToSpeech.QUEUE_ADD, null, utteranceId)
                 textToSpeechQueue.clear()
             }
         }
@@ -121,6 +124,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private val userMessageReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
+            Log.d("MainActivity", "2-userMessageReceiver")
             val message = intent?.getStringExtra("message")
             messageAdapter.addMessages(Message(message!!, true))
 //            llmService.runInference(message)
@@ -153,10 +157,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
 
         pipeline.startRecording()
-
         val filter = IntentFilter(Events.KWS_DETECTED)
         LocalBroadcastManager.getInstance(this).registerReceiver(receiver, filter)
-
         val filter2 = IntentFilter(Events.ON_ASSISTANT_MESSAGE)
         LocalBroadcastManager.getInstance(this).registerReceiver(messageReceiver, filter2)
 
@@ -169,7 +171,6 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         messageAdapter = MessageAdapter(messageList)
         recyclerView.adapter = messageAdapter
-
 
     }
 
@@ -238,14 +239,43 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
             tts.setLanguage(java.util.Locale.US)
-
+            setupUtteranceProgressListener()
             Log.d("TTS", "Initialization Success!")
         } else {
             Log.e("TTS", "Initialization Failed!")
         }
     }
+    private fun setupUtteranceProgressListener() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                override fun onStart(utteranceId: String?) {
+                    Log.d("TTS", "onStart utteranceId=$utteranceId")
+                }
 
+                override fun onDone(utteranceId: String?) {
+                    Log.d("TTS", "onDone utteranceId=$utteranceId")
+                    if (utteranceId == this@MainActivity.utteranceId) {
+                        Log.d("TTS", "Stop floating button service")
+                        stopFloatingButtonService()
+                    }
+                }
 
+                override fun onError(utteranceId: String?) {
+                    Log.e("TTS", "onError utteranceId=$utteranceId")
+                }
+            })
+        } else {
+            Log.e("TTS", "UtteranceProgressListener is not supported on this device.")
+        }
+    }
+    private fun stopFloatingButtonService() {
+        val intent = Intent(this, OverlayService::class.java)
+        stopService(intent)
+    }
+
+    private fun startFloatingButtonService() {
+        val intent = Intent(this, OverlayService::class.java)
+        startService(intent)
+    }
 
 }
-
