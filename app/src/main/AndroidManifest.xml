@@ -66,6 +66,13 @@
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
             android:exported="true"/>
 
+        <service
+            android:name="service.ForegroundService"
+            android:foregroundServiceType="dataSync"
+            android:enabled="true"
+            android:exported="false"
+            tools:ignore="MissingClass" />
+
         <activity
             android:name="ai.assistant.MainActivity"
             android:exported="true">
